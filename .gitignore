@@ -1,0 +1,10 @@
+.build/
+.swiftpm/
+build/
+*.xcodeproj/
+DerivedData/
+*.app/
+.DS_Store
+*.log
+Sources.bak*/
+TestRunner
