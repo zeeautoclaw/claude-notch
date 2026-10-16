@@ -2,19 +2,19 @@ import Foundation
 
 // ClaudeNotchRelay
 // ----------------
-// 由 Claude Code hook 系统调用的 CLI bridge:
-//   1. 从 stdin 读 hook payload (JSON)
-//   2. 包装成 HookEvent 通过 Unix socket 发给主 app
-//   3. 等响应 (默认 60 秒)
-//   4. 把 Claude Code 期望的 JSON 写到 stdout
-//   5. 退出码永远 0 (避免 Claude Code 把 hook 当失败)
+// CLI bridge called by the Claude Code hook system:
+//   1. Read the hook payload (JSON) from stdin
+//   2. Wrap it in a HookEvent and send it to the main app over a Unix socket
+//   3. Wait for the response (60 seconds by default)
+//   4. Write the JSON Claude Code expects to stdout
+//   5. Always exit 0 (so Claude Code never treats the hook as failed)
 //
-// 关键降级行为:
-//   - app 没起 → 立即放行 ({"continue":true})
-//   - 超时 → 放行
-//   - 解析失败 → 放行
+// Fallback behavior:
+//   - app not running → allow immediately ({"continue":true})
+//   - timeout → allow
+//   - parse failure → allow
 //
-// 命令行: ClaudeNotchRelay --event PreToolUse [--timeout 60]
+// Usage: ClaudeNotchRelay --event PreToolUse [--timeout 60]
 
 let logger = Logger(tag: "relay")
 
@@ -51,23 +51,23 @@ func main() {
     let (eventName, timeout) = parseArgs()
     logger.info("relay invoked: event=\(eventName) timeout=\(timeout)")
 
-    // 读 stdin
+    // Read stdin
     let stdinData = FileHandle.standardInput.readDataToEndOfFile()
 
-    // 解析 payload
+    // Parse the payload
     let payload: AnyCodable
     if stdinData.isEmpty {
         payload = .object([:])
     } else if let parsed = try? HookCodec.decoder.decode(AnyCodable.self, from: stdinData) {
         payload = parsed
     } else {
-        // 不是合法 JSON,作为 string 转发
+        // Not valid JSON — forward it as a string
         payload = .string(String(data: stdinData, encoding: .utf8) ?? "")
     }
 
-    // 收集环境
+    // Collect the environment
     var env = ProcessInfo.processInfo.environment
-    // 砍掉敏感/无关字段降低体积
+    // Drop sensitive/irrelevant fields to keep it small
     let keepKeys: Set<String> = [
         "ITERM_SESSION_ID", "TERM_SESSION_ID", "TERM_PROGRAM",
         "TERM_PROGRAM_VERSION", "TMUX_PANE", "TMUX",
@@ -86,13 +86,13 @@ func main() {
         ppid: Int(getppid())
     )
 
-    // 编码
+    // Encode
     guard let requestData = try? HookCodec.encoder.encode(event) else {
         logger.warn("failed to encode HookEvent, defaulting to allow")
         emit(allowJSON)
     }
 
-    // 发给主 app
+    // Send to the main app
     do {
         let respData = try UnixSocketClient.sendAndReceive(
             path: Paths.socket,

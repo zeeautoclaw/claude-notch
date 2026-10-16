@@ -1,7 +1,7 @@
 #!/bin/bash
-# 构建 ClaudeNotchRelay 和 ClaudeNotchApp。
-# 由于 Command Line Tools 不带 Platforms 目录,SwiftPM (swift build) 在 Swift 5.8 上会失败。
-# 这里改用 swiftc 直接编译。
+# Build ClaudeNotchRelay and ClaudeNotchApp.
+# SwiftPM (swift build) does not work for this layout, so we call swiftc directly.
+# Requires full Xcode (SwiftUI macros are not in the Command Line Tools).
 
 set -euo pipefail
 
@@ -21,7 +21,7 @@ if [[ "${DEBUG:-0}" = "1" ]]; then
     FLAGS="$DEBUG_FLAGS"
 fi
 
-echo "==> 编译 ClaudeNotchRelay"
+echo "==> Compiling ClaudeNotchRelay"
 xcrun swiftc $FLAGS \
     -target arm64-apple-macos27.0 \
     -module-name ClaudeNotchRelay \
@@ -29,7 +29,7 @@ xcrun swiftc $FLAGS \
     "${SHARED_SRC[@]}" \
     "${RELAY_SRC[@]}"
 
-echo "==> 编译 ClaudeNotchApp"
+echo "==> Compiling ClaudeNotchApp"
 xcrun swiftc $FLAGS \
     -target arm64-apple-macos27.0 \
     -module-name ClaudeNotchApp \
@@ -40,7 +40,7 @@ xcrun swiftc $FLAGS \
     "${SHARED_SRC[@]}" \
     "${APP_SRC[@]}"
 
-echo "==> 二进制大小:"
+echo "==> Binary sizes:"
 ls -lh "$BUILD/ClaudeNotchRelay" "$BUILD/ClaudeNotchApp" | awk '{print "    " $9 ": " $5}'
 
-echo "==> 完成。"
+echo "==> Done."

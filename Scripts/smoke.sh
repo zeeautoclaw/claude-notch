@@ -1,10 +1,10 @@
 #!/bin/bash
-# 端到端冒烟测试 — 不依赖真实 Claude Code。
-# 检查:
-#   1. relay 在 app 没起时立即放行 ({"continue":true})
-#   2. app 起来后 relay 能投递事件并返回响应
-#   3. 自动放行规则生效 (auto-allow)
-#   4. settings.json 注入 + 卸载在 fixture 上无副作用
+# End-to-end smoke test — does not need a real Claude Code.
+# Checks:
+#   1. relay allows immediately when the app is not running ({"continue":true})
+#   2. once the app is up, relay delivers the event and gets a response
+#   3. auto-allow rules take effect
+#   4. settings.json inject + uninstall leave the fixture unchanged
 
 set -euo pipefail
 
@@ -44,68 +44,68 @@ trap cleanup EXIT
 [[ -x "$RELAY" ]] || { echo "missing $RELAY"; exit 1; }
 [[ -x "$APP"   ]] || { echo "missing $APP";   exit 1; }
 
-echo "=== 1) relay 在 app 没起时应立即放行 ==="
+echo "=== 1) relay should allow immediately when the app is not running ==="
 RES=$(CLAUDE_NOTCH_SOCKET="$SOCKET" \
       "$RELAY" --event PreToolUse --timeout 2 \
       <<<'{"tool_name":"Bash","tool_input":{"command":"ls"}}' 2>/dev/null)
 check "no-server defaults allow" '"continue":true' "$RES"
 
 echo ""
-echo "=== 2) app 起来后 relay 能拿到响应 ==="
-# 启 app (用自定义 socket 路径,避免污染默认)
+echo "=== 2) relay gets a response once the app is up ==="
+# Start the app on a custom socket path so the default one is untouched
 CLAUDE_NOTCH_SOCKET="$SOCKET" "$APP" >/dev/null 2>&1 &
 APP_PID=$!
-# 等 socket 出现 (最多 5 秒)
+# Wait for the socket (up to 5 seconds)
 for _ in $(seq 1 50); do
     [[ -S "$SOCKET" ]] && break
     sleep 0.1
 done
 if [[ ! -S "$SOCKET" ]]; then
-    echo "  ❌ app 没在指定 socket 监听 (PID=$APP_PID)"
+    echo "  ❌ app is not listening on the socket (PID=$APP_PID)"
     FAIL=$((FAIL+1))
     exit 1
 fi
-echo "  ✅ app 启动监听 $SOCKET (PID=$APP_PID)"
+echo "  ✅ app listening on $SOCKET (PID=$APP_PID)"
 PASS=$((PASS+1))
 
 echo ""
-echo "=== 3) Notification 事件应即时放行 (无审批 UI) ==="
+echo "=== 3) Notification events are allowed immediately (no approval UI) ==="
 RES=$(CLAUDE_NOTCH_SOCKET="$SOCKET" \
       "$RELAY" --event Notification --timeout 5 \
       <<<'{"message":"hello"}' 2>/dev/null)
 check "notification allow" '"continue":true' "$RES"
 
 echo ""
-echo "=== 4) 日志文件应包含我们的事件 ==="
+echo "=== 4) the log file should contain our event ==="
 sleep 0.5
 LOG="$HOME/Library/Logs/ClaudeNotch/app.log"
 if [[ -f "$LOG" ]]; then
     if grep -q "Notification" "$LOG"; then
-        echo "  ✅ 日志记录到 Notification 事件"
+        echo "  ✅ Notification event logged"
         PASS=$((PASS+1))
     else
-        echo "  ⚠️  日志里没找到 Notification (可能延迟)"
+        echo "  ⚠️  Notification not found in log yet (may be delayed)"
     fi
 fi
 
 echo ""
-echo "=== 5) app 优雅关闭 ==="
+echo "=== 5) app shuts down cleanly ==="
 kill "$APP_PID"
 wait "$APP_PID" 2>/dev/null || true
 APP_PID=""
 sleep 0.3
 
-# 此时 socket 应被清理
+# The socket should be removed by now
 if [[ ! -S "$SOCKET" ]]; then
-    echo "  ✅ socket 已清理"
+    echo "  ✅ socket removed"
     PASS=$((PASS+1))
 else
-    echo "  ❌ socket 残留"
+    echo "  ❌ socket left behind"
     FAIL=$((FAIL+1))
 fi
 
 echo ""
-echo "=== 6) app 关闭后 relay 应再次降级放行 ==="
+echo "=== 6) relay falls back to allow after the app quits ==="
 RES=$(CLAUDE_NOTCH_SOCKET="$SOCKET" \
       "$RELAY" --event PreToolUse --timeout 2 \
       <<<'{"tool_name":"Bash"}' 2>/dev/null)

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 极简 markdown 渲染:支持标题/列表/段落 + inline `code` / **bold**。
+/// Minimal markdown rendering: headings/lists/paragraphs + inline `code` / **bold**.
 public struct SimpleMarkdown: View {
     let text: String
 
@@ -114,7 +114,7 @@ public struct SimpleMarkdown: View {
     }
 }
 
-/// inline 转换工具 — 把 `code` 和 **bold** 变成 AttributedString。
+/// Inline conversion — turns `code` and **bold** into an AttributedString.
 enum MarkdownInline {
     static func attributed(_ src: String) -> AttributedString {
         var attr = AttributedString(src)
@@ -124,16 +124,16 @@ enum MarkdownInline {
     }
 
     private static func applyBackticks(_ attr: inout AttributedString) {
-        // 找成对的 ` ... ` 段落,设 monospace + 浅色背景
+        // Find paired ` ... ` spans, apply monospace + a light background
         while let openRange = attr.range(of: "`") {
             let after = openRange.upperBound
             guard let closeRange = attr[after...].range(of: "`") else { break }
-            // 先去 close,再去 open,避免索引漂移
+            // Remove the closing marker first, then the opening one, so indices do not drift
             attr.removeSubrange(closeRange)
-            // 注意: open 的 range 没变,但 after 之后的字符串现在缩短了
-            // 重新计算被包的范围
+            // Note: the open range is unchanged, but the string after it is now shorter
+            // Recompute the wrapped range
             let codeRange = openRange.upperBound..<closeRange.lowerBound
-            // 应用样式
+            // Apply the style
             var container = AttributeContainer()
             container.font = .system(size: 12, design: .monospaced)
             container.backgroundColor = .gray.opacity(0.18)

@@ -1,7 +1,7 @@
 import Foundation
 
 public enum Paths {
-    /// IPC socket 路径 — relay 与主 app 之间的通信。
+    /// IPC socket path — communication between the relay and the main app.
     public static var socket: String {
         if let p = ProcessInfo.processInfo.environment["CLAUDE_NOTCH_SOCKET"] {
             return p
@@ -11,18 +11,18 @@ public enum Paths {
         return "\(tmp)claude-notch-\(uid).sock"
     }
 
-    /// Claude Code 配置文件。
+    /// Claude Code settings file.
     public static var claudeSettings: String {
         let home = NSHomeDirectory()
         return "\(home)/.claude/settings.json"
     }
 
-    /// 配置文件备份(由 SettingsInjector 使用)。
+    /// Settings backup (used by SettingsInjector).
     public static var claudeSettingsBackup: String {
         return claudeSettings + ".claude-notch.bak"
     }
 
-    /// Always Allow 规则持久化路径。
+    /// Where Always Allow rules are stored.
     public static var rules: String {
         let home = NSHomeDirectory()
         let dir = "\(home)/Library/Application Support/ClaudeNotch"
@@ -32,7 +32,7 @@ public enum Paths {
         return "\(dir)/rules.json"
     }
 
-    /// 日志路径。
+    /// Log path.
     public static var logFile: String {
         let home = NSHomeDirectory()
         let dir = "\(home)/Library/Logs/ClaudeNotch"

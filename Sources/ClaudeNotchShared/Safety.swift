@@ -1,13 +1,13 @@
 import Foundation
 
-/// 危险命令检测。
-/// 只看工具输入里的 `command` 字段 (Bash、终端类工具),按整词/命令位置匹配,
-/// 不再用简单子串 — 以前 "dd " 会命中普通英文里的 "add "。
+/// Dangerous command detection.
+/// Only looks at the `command` field of the tool input (Bash and terminal tools) and matches whole words / command positions,
+/// not plain substrings — previously "dd " matched the "add " in ordinary text.
 public enum Safety {
-    /// 命令分隔位置:行首,或空白 / ; & | ( ` 之后。
+    /// Where a command can start: beginning of line, or after whitespace / ; & | ( `.
     private static let cmdStart = #"(?:^|[\s;&|(`])"#
 
-    /// 每条规则是一段正则 (对小写后的命令匹配)。
+    /// Each rule is a regular expression matched against the lowercased command.
     static let dangerousPatterns: [String] = [
         cmdStart + #"sudo\b"#,
         cmdStart + #"dd\s+\S"#,
@@ -35,9 +35,9 @@ public enum Safety {
 
     // MARK: - rm
 
-    /// rm 同时带"递归"和"强制",或者目标是根目录 / 家目录本身。
+    /// rm with both "recursive" and "force", or targeting the root / home folder itself.
     private static func hasDangerousRm(_ cmd: String) -> Bool {
-        // 引号、括号、冒号当空白,这样原始 JSON 文本里的 "rm 也能认出来
+        // Treat quotes, brackets and colons as spaces so "rm inside raw JSON text is still caught
         let cleaned = String(cmd.map { "\"'{}()[],:".contains($0) ? " " : $0 })
         for segment in commandSegments(cleaned) {
             let words = segment.split(whereSeparator: { $0 == " " || $0 == "\t" }).map(String.init)
@@ -58,20 +58,20 @@ public enum Safety {
         return false
     }
 
-    /// 按 ; && || | 切成一条条子命令。
+    /// Split into sub-commands on ; && || |.
     private static func commandSegments(_ cmd: String) -> [String] {
         cmd.components(separatedBy: CharacterSet(charactersIn: ";&|\n"))
     }
 
-    // MARK: - 网络下载
+    // MARK: - Network downloads
 
     private static func usesNetworkTool(_ cmd: String) -> Bool {
         matches(cmd, cmdStart + #"(curl|wget)\b"#)
     }
 
-    /// 下载目标是否全部是本机。
-    /// 目标 = 所有 http(s):// 地址 + 以 localhost / 127.0.0.1 等开头的裸地址;
-    /// 一个目标都认不出 (比如 `curl example.com`) 时不算本机。
+    /// Whether every download target is this machine.
+    /// Targets = all http(s):// URLs + bare addresses starting with localhost / 127.0.0.1 etc.;
+    /// if no target can be recognized (e.g. `curl example.com`) it does not count as local.
     private static func isLocalhostOnly(_ cmd: String) -> Bool {
         let localHosts: Set<String> = ["localhost", "127.0.0.1", "0.0.0.0", "::1", "[::1]"]
         var hosts: [String] = []
@@ -103,9 +103,9 @@ public enum Safety {
         text.range(of: pattern, options: .regularExpression) != nil
     }
 
-    // MARK: - 规则辅助
+    // MARK: - Rule helpers
 
-    /// 提取 bash 命令的"第一个词" — 用于细粒度规则。
+    /// Extracts the "first word" of a bash command — used for fine-grained rules.
     /// "ls -la /tmp" → "ls";"/usr/bin/cat foo" → "cat"
     public static func firstWord(of cmd: String) -> String? {
         let trimmed = cmd.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -117,7 +117,7 @@ public enum Safety {
         return s
     }
 
-    /// 一些总是只读、可放心 Always Allow 的命令前缀建议。
+    /// Command prefixes that are always read-only and safe to Always Allow.
     public static let safeReadOnlyCommands: Set<String> = [
         "ls", "cat", "head", "tail", "grep", "rg", "find",
         "pwd", "echo", "wc", "stat", "file", "tree",

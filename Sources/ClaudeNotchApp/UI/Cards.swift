@@ -1,24 +1,24 @@
 import SwiftUI
 
 // =============================================================================
-// MARK: - 设计常量
+// MARK: - Design constants
 // =============================================================================
 
-/// 卡片的尺寸和圆角。内层圆角 = 外层圆角 - 内边距,保持同心。
+/// Card size and corner radii. Inner radius = outer radius - padding, so corners stay concentric.
 enum NotchMetrics {
     static let cardWidth: CGFloat = 380
     static let cardPadding: CGFloat = 18
     static let cardRadius: CGFloat = 28
     static let innerRadius: CGFloat = cardRadius - cardPadding + 4
-    /// 卡片四周留给玻璃高光和阴影的透明边距,窗口按它放大,避免被方形窗口裁出暗框。
+    /// Transparent margin around the card for the glass highlight and shadow; the window grows by this so nothing gets clipped.
     static let shadowMargin: CGFloat = 28
 }
 
 // =============================================================================
-// MARK: - 共享组件
+// MARK: - Shared components
 // =============================================================================
 
-/// 卡片容器 — Liquid Glass 材质,可选整体染色 (危险操作用橙色)。
+/// Card container — Liquid Glass material, optionally tinted (orange for risky actions).
 struct NotchCardContainer<Content: View>: View {
     var tint: Color? = nil
     let content: Content
@@ -43,7 +43,7 @@ struct NotchCardContainer<Content: View>: View {
     }
 }
 
-/// 卡片头部 — 彩色符号 + 标题 + 副标题,右侧可选徽章。
+/// Card header — colored symbol + title + subtitle, optional badge on the right.
 struct CardIconHeader: View {
     let symbol: String
     let title: String
@@ -87,8 +87,8 @@ struct CardIconHeader: View {
     }
 }
 
-/// 主要操作按钮 — 实色渐变胶囊 + 玻璃高光描边。
-/// 不用玻璃染色:浮窗不会成为活动窗口,玻璃染色和系统按钮都会被画成灰色的"非活动"样子。
+/// Primary action button — solid gradient capsule + glass highlight stroke.
+/// Not glass-tinted: the panel never becomes the active window, and tinted glass or system buttons would render grey/inactive.
 struct PrimaryActionButton: View {
     let title: String
     var icon: String? = nil
@@ -118,7 +118,7 @@ struct PrimaryActionButton: View {
     }
 }
 
-/// 次要操作按钮 — 不染色的玻璃胶囊。
+/// Secondary action button — untinted glass capsule.
 struct SecondaryActionButton: View {
     let title: String
     var icon: String? = nil
@@ -134,7 +134,7 @@ struct SecondaryActionButton: View {
     }
 }
 
-/// 玻璃按钮里的图标 + 文字,撑满可用宽度。
+/// Icon + text inside a glass button, filling the available width.
 private struct GlassButtonLabel: View {
     let title: String
     let icon: String?
@@ -152,7 +152,7 @@ private struct GlassButtonLabel: View {
     }
 }
 
-/// 一行主/次按钮,放进同一个玻璃容器里,让两颗玻璃按钮一起渲染。
+/// A row of primary/secondary buttons in one glass container so they render together.
 struct ActionRow<Content: View>: View {
     @ViewBuilder let content: Content
 
@@ -163,7 +163,7 @@ struct ActionRow<Content: View>: View {
     }
 }
 
-/// 文字行动项 — 无边框,卡片底部用。
+/// Text action — borderless, used at the bottom of the card.
 struct TextActionButton: View {
     let title: String
     var icon: String? = nil
@@ -193,7 +193,7 @@ struct TextActionButton: View {
     }
 }
 
-/// 命令/参数预览块 — 等宽字体,浅色内凹底。
+/// Command/argument preview — monospaced text on a subtle inset background.
 struct CodeBlock: View {
     let text: String
     var lineLimit: Int = 3
@@ -213,7 +213,7 @@ struct CodeBlock: View {
     }
 }
 
-/// 把 "mcp__ccd_session__start_session" 这类工具名变成好读的 "ccd_session · start_session"。
+/// Turns tool names like "mcp__ccd_session__start_session" into a readable "ccd_session · start_session".
 enum ToolName {
     static func pretty(_ raw: String?) -> String {
         guard let raw, !raw.isEmpty else { return "Unknown" }
@@ -225,7 +225,7 @@ enum ToolName {
 }
 
 // =============================================================================
-// MARK: - 审批卡片 (PreToolUse)
+// MARK: - Approval card (PreToolUse)
 // =============================================================================
 
 struct ApprovalCard: View {
@@ -243,7 +243,7 @@ struct ApprovalCard: View {
             VStack(alignment: .leading, spacing: 14) {
                 CardIconHeader(
                     symbol: isDangerous ? "exclamationmark.shield.fill" : "checkmark.shield.fill",
-                    title: isDangerous ? "需要你确认 · 可能有风险" : "Claude 想要执行",
+                    title: isDangerous ? "Needs your OK · may be risky" : "Claude wants to run",
                     tint: isDangerous ? .orange : .blue,
                     subtitle: prettyCWD,
                     badge: waiting > 0 ? "+\(waiting)" : nil
@@ -261,43 +261,43 @@ struct ApprovalCard: View {
                     }
                 }
 
-                // 主操作行
+                // Primary actions
                 ActionRow {
-                    SecondaryActionButton(title: "拒绝", icon: "xmark") {
+                    SecondaryActionButton(title: "Deny", icon: "xmark") {
                         onResolve(.deny)
                     }
                     PrimaryActionButton(
-                        title: "允许",
+                        title: "Allow",
                         icon: "checkmark",
                         tint: isDangerous ? .orange : .blue
                     ) { onResolve(.allow) }
                 }
 
                 if isDangerous {
-                    Label("不处理的话,约 50 秒后会自动拒绝", systemImage: "timer")
+                    Label("If you do nothing, this is denied in about 50 seconds", systemImage: "timer")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .center)
                 }
 
-                // 次要操作行
+                // Secondary actions
                 HStack(spacing: 4) {
                     if event.toolName == "Bash", let firstWord = bashFirstWord, !isDangerous {
                         TextActionButton(
-                            title: "总是允许 \(firstWord)*",
+                            title: "Always allow \(firstWord)*",
                             icon: "checkmark.shield"
                         ) {
                             addCommandPrefixRule(firstWord)
                             onResolve(.allow)
                         }
                     } else if !isDangerous, event.toolName != nil {
-                        TextActionButton(title: "总是允许此工具", icon: "checkmark.shield") {
+                        TextActionButton(title: "Always allow this tool", icon: "checkmark.shield") {
                             addToolRule()
                             onResolve(.allow)
                         }
                     }
 
-                    TextActionButton(title: "到终端", icon: "command") {
+                    TextActionButton(title: "Go to terminal", icon: "command") {
                         onJumpTerminal()
                     }
                 }
@@ -317,7 +317,7 @@ struct ApprovalCard: View {
 
     private func addToolRule() {
         guard let tool = event.toolName else { return }
-        rules.add(AllowRule(scope: .tool, value: tool, label: "整个 \(tool) 工具"))
+        rules.add(AllowRule(scope: .tool, value: tool, label: "All of \(tool)"))
     }
 
     private func addCommandPrefixRule(_ prefix: String) {
@@ -325,13 +325,13 @@ struct ApprovalCard: View {
         rules.add(AllowRule(
             scope: .toolWithCommand,
             value: "\(tool):\(prefix)",
-            label: "\(tool) 中以 \(prefix) 开头"
+            label: "\(tool) starting with \(prefix)"
         ))
     }
 }
 
 // =============================================================================
-// MARK: - 提问卡片 (Notification / UserPromptSubmit 触发的等待)
+// MARK: - Question card (waiting triggered by Notification / UserPromptSubmit)
 // =============================================================================
 
 struct QuestionCard: View {
@@ -347,7 +347,7 @@ struct QuestionCard: View {
             VStack(alignment: .leading, spacing: 12) {
                 CardIconHeader(
                     symbol: "questionmark",
-                    title: "Claude 在问",
+                    title: "Claude is asking",
                     tint: .purple,
                     badge: waiting > 0 ? "+\(waiting)" : nil
                 )
@@ -361,14 +361,14 @@ struct QuestionCard: View {
 
                 ActionRow {
                     PrimaryActionButton(
-                        title: "到终端回答",
+                        title: "Answer in terminal",
                         icon: "command",
                         tint: .purple
                     ) {
                         onJumpTerminal()
                         onResolve(.askUser)
                     }
-                    SecondaryActionButton(title: "忽略") {
+                    SecondaryActionButton(title: "Ignore") {
                         onResolve(.allow)
                     }
                 }
@@ -384,7 +384,7 @@ struct QuestionCard: View {
 }
 
 // =============================================================================
-// MARK: - 选项卡片 (PreToolUse · AskUserQuestion)
+// MARK: - Choice card (PreToolUse · AskUserQuestion)
 // =============================================================================
 
 struct QuestionChoiceCard: View {
@@ -406,7 +406,7 @@ struct QuestionChoiceCard: View {
             VStack(alignment: .leading, spacing: 12) {
                 CardIconHeader(
                     symbol: "questionmark",
-                    title: "Claude 在问",
+                    title: "Claude is asking",
                     tint: .purple,
                     badge: optionCountBadge
                 )
@@ -431,10 +431,10 @@ struct QuestionChoiceCard: View {
                 }
 
                 ActionRow {
-                    SecondaryActionButton(title: "到终端手动答", icon: "command") {
+                    SecondaryActionButton(title: "Answer in terminal", icon: "command") {
                         onJumpTerminal()
                     }
-                    SecondaryActionButton(title: "取消") {
+                    SecondaryActionButton(title: "Cancel") {
                         onCancel()
                     }
                 }
@@ -444,7 +444,7 @@ struct QuestionChoiceCard: View {
 
     private var optionCountBadge: String? {
         let c = options.count
-        return c > 0 ? "\(c) 个选项" : nil
+        return c > 0 ? "\(c) options" : nil
     }
 
     private var questionText: String {
@@ -452,7 +452,7 @@ struct QuestionChoiceCard: View {
         if let q = qs.first?["question"]?.stringValue { return q }
         if let q = event.toolInput?["question"]?.stringValue { return q }
         if let q = event.toolInput?["prompt"]?.stringValue { return q }
-        return "请选择"
+        return "Please choose"
     }
 
     private var options: [Option] {
@@ -543,7 +543,7 @@ private struct QuestionOptionRow: View {
 }
 
 // =============================================================================
-// MARK: - Plan 卡片 (ExitPlanMode)
+// MARK: - Plan card (ExitPlanMode)
 // =============================================================================
 
 struct PlanCard: View {
@@ -558,7 +558,7 @@ struct PlanCard: View {
             VStack(alignment: .leading, spacing: 12) {
                 CardIconHeader(
                     symbol: "list.bullet",
-                    title: "Claude 的计划",
+                    title: "Claude's plan",
                     tint: .green,
                     badge: "1/1"
                 )
@@ -571,12 +571,12 @@ struct PlanCard: View {
 
                 ActionRow {
                     PrimaryActionButton(
-                        title: "批准并执行",
+                        title: "Approve and run",
                         icon: "play.fill",
                         tint: .green
                     ) { onResolve(.allow) }
 
-                    SecondaryActionButton(title: "打回", icon: "arrow.uturn.left") {
+                    SecondaryActionButton(title: "Send back", icon: "arrow.uturn.left") {
                         onResolve(.deny)
                     }
                 }

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 菜单栏 popover 里的 session 列表 + 简易设置。
+/// Session list + simple settings inside the menu bar popover.
 public struct SessionListPanel: View {
     @ObservedObject var sessions: SessionStore
     @ObservedObject var rules: RulesStore
@@ -59,7 +59,7 @@ public struct SessionListPanel: View {
         DisclosureGroup(isExpanded: $showRules) {
             VStack(alignment: .leading, spacing: 4) {
                 if rules.rules.isEmpty {
-                    Text("暂无规则。在审批卡片上点 \"总是允许...\" 按钮即可添加。")
+                    Text("No rules yet. Tap \"Always allow...\" on an approval card to add one.")
                         .font(.caption).foregroundColor(.secondary)
                         .padding(.vertical, 4)
                 } else {
@@ -85,7 +85,7 @@ public struct SessionListPanel: View {
         } label: {
             HStack {
                 Image(systemName: "checkmark.shield")
-                Text("Always Allow 规则 (\(rules.rules.count))")
+                Text("Always Allow rules (\(rules.rules.count))")
                     .font(.subheadline)
             }
         }
@@ -94,13 +94,13 @@ public struct SessionListPanel: View {
 
     private func scopeText(_ rule: AllowRule) -> String {
         switch rule.scope {
-        case .tool:            return "整个工具: \(rule.value)"
-        case .toolWithCommand: return "命令前缀: \(rule.value)"
-        case .project:         return "项目: \(rule.value)"
+        case .tool:            return "Whole tool: \(rule.value)"
+        case .toolWithCommand: return "Command prefix: \(rule.value)"
+        case .project:         return "Project: \(rule.value)"
         }
     }
 
-    // MARK: - 子视图
+    // MARK: - Subviews
 
     private var header: some View {
         HStack(spacing: 8) {
@@ -109,7 +109,7 @@ public struct SessionListPanel: View {
             Text("Claude Notch")
                 .font(.headline)
             Spacer()
-            Text(installed ? "已注入" : "未注入")
+            Text(installed ? "Hooks installed" : "Hooks not installed")
                 .font(.caption)
                 .padding(.horizontal, 8).padding(.vertical, 2)
                 .background(installed ? Color.green.opacity(0.18) : Color.orange.opacity(0.2))
@@ -124,9 +124,9 @@ public struct SessionListPanel: View {
             Image(systemName: "moon.zzz")
                 .font(.title2)
                 .foregroundColor(.secondary)
-            Text("没有活跃的 session")
+            Text("No active sessions")
                 .font(.subheadline).foregroundColor(.secondary)
-            Text("在终端里跑 \(Text("claude").font(.system(.subheadline, design: .monospaced))) 就会出现在这里")
+            Text("Run \(Text("claude").font(.system(.subheadline, design: .monospaced))) in a terminal and it shows up here")
                 .font(.caption).foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
         }
@@ -137,18 +137,18 @@ public struct SessionListPanel: View {
     private var footer: some View {
         HStack(spacing: 6) {
             if installed {
-                Button("卸载 Hook", action: onUninstall).buttonStyle(.borderless)
+                Button("Uninstall Hooks", action: onUninstall).buttonStyle(.borderless)
             } else {
-                Button("安装 Hook", action: onInstall).buttonStyle(.borderless)
+                Button("Install Hooks", action: onInstall).buttonStyle(.borderless)
             }
             Spacer()
             Menu {
-                Button("触发演示卡片", action: onTriggerDemo)
-                Button("打开日志", action: onOpenLog)
-                Button("清理已完成", action: onClearDone)
+                Button("Show Demo Card", action: onTriggerDemo)
+                Button("Open Log", action: onOpenLog)
+                Button("Clear Finished", action: onClearDone)
                     .disabled(sessions.sortedActive.allSatisfy { !$0.isDone })
                 Divider()
-                Button("退出 Claude Notch", action: onQuit)
+                Button("Quit Claude Notch", action: onQuit)
             } label: {
                 Image(systemName: "ellipsis.circle")
             }
@@ -186,7 +186,7 @@ private struct SessionRow: View {
                 }
 
                 if !info.lastUserPrompt.isEmpty {
-                    Text("你: \(info.lastUserPrompt)")
+                    Text("You: \(info.lastUserPrompt)")
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .lineLimit(2)
@@ -195,14 +195,14 @@ private struct SessionRow: View {
                 statusLine
             }
 
-            // 右侧操作按钮:跳转 / 结束
+            // Action buttons on the right: jump / end
             VStack(spacing: 6) {
                 Button(action: onJump) {
                     Image(systemName: "arrow.up.forward.app")
                         .font(.caption)
                 }
                 .buttonStyle(.borderless)
-                .help("跳到终端")
+                .help("Go to terminal")
 
                 if info.claudePID != nil && info.status != .done {
                     Button(action: onKill) {
@@ -211,7 +211,7 @@ private struct SessionRow: View {
                             .foregroundColor(.red.opacity(0.75))
                     }
                     .buttonStyle(.borderless)
-                    .help("结束这个 claude 进程")
+                    .help("End this claude process")
                 }
             }
             .opacity(hovering ? 1.0 : 0.45)
@@ -246,22 +246,22 @@ private struct SessionRow: View {
         switch info.status {
         case .running:
             if let tool = info.lastToolName {
-                Text("正在 \(tool)\(info.lastToolPreview.map { ": \($0)" } ?? "")")
+                Text("Running \(tool)\(info.lastToolPreview.map { ": \($0)" } ?? "")")
                     .font(.caption2.italic())
                     .foregroundColor(.blue.opacity(0.85))
                     .lineLimit(1)
             } else {
-                Text("运行中").font(.caption2.italic()).foregroundColor(.blue.opacity(0.85))
+                Text("Running").font(.caption2.italic()).foregroundColor(.blue.opacity(0.85))
             }
         case .waiting:
             HStack(spacing: 4) {
                 Image(systemName: "hand.raised.fill").font(.caption2)
-                Text("等待审批: \(info.lastToolName ?? "?")")
+                Text("Waiting for approval: \(info.lastToolName ?? "?")")
             }
             .font(.caption2.italic())
             .foregroundColor(.orange)
         case .done:
-            Text("✓ 完成 — 点击跳转")
+            Text("✓ Done — click to jump")
                 .font(.caption2)
                 .foregroundColor(.green)
         }

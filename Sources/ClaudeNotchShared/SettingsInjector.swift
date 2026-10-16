@@ -1,7 +1,7 @@
 import Foundation
 
-/// 把 Claude Notch 的 hook 命令注入 / 移除 ~/.claude/settings.json。
-/// 严格遵循 Claude Code 的 hooks 配置 schema:
+/// Injects / removes Claude Notch hook commands in ~/.claude/settings.json.
+/// Follows the Claude Code hooks settings schema:
 /// {
 ///   "hooks": {
 ///     "PreToolUse": [
@@ -15,7 +15,7 @@ public final class SettingsInjector {
     public let backupPath: String
     public let relayPath: String
 
-    /// 我们要注入的事件类型。
+    /// Event types we inject.
     public static let events: [String] = [
         "PreToolUse",
         "Notification",
@@ -33,7 +33,7 @@ public final class SettingsInjector {
         self.relayPath = relayPath
     }
 
-    // MARK: 公共 API
+    // MARK: Public API
 
     public func install() throws {
         let parentDir = (settingsPath as NSString).deletingLastPathComponent
@@ -43,7 +43,7 @@ public final class SettingsInjector {
 
         var root = try loadSettings()
 
-        // 备份原始文件 (只在第一次安装时备份)
+        // Back up the original file (only on the first install)
         if !FileManager.default.fileExists(atPath: backupPath),
            FileManager.default.fileExists(atPath: settingsPath) {
             try FileManager.default.copyItem(atPath: settingsPath, toPath: backupPath)
@@ -75,7 +75,7 @@ public final class SettingsInjector {
         return entries.contains(where: entryBelongsToUs)
     }
 
-    // MARK: 内部 helpers
+    // MARK: Internal helpers
 
     func loadSettings() throws -> [String: Any] {
         guard FileManager.default.fileExists(atPath: settingsPath),
@@ -92,7 +92,7 @@ public final class SettingsInjector {
             withJSONObject: root,
             options: [.prettyPrinted, .sortedKeys]
         )
-        // JSONSerialization 默认把 `/` 转义成 `\/`,可读性差且 Claude 不需要这个转义
+        // JSONSerialization escapes `/` as `\/` by default, which is hard to read and Claude does not need it
         var raw = String(data: data, encoding: .utf8) ?? ""
         raw = raw.replacingOccurrences(of: "\\/", with: "/")
         try raw.write(to: URL(fileURLWithPath: settingsPath), atomically: true, encoding: .utf8)
@@ -103,10 +103,10 @@ public final class SettingsInjector {
         var hooks = (root["hooks"] as? [String: Any]) ?? [:]
         var entries = (hooks[event] as? [[String: Any]]) ?? []
 
-        // 移除旧的 (用 relayPath 匹配)
+        // Remove old entries (matched by relayPath)
         entries.removeAll(where: entryBelongsToUs)
 
-        // 添加新的
+        // Add new ones
         let entry: [String: Any] = [
             "matcher": "*",
             "hooks": [

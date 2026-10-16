@@ -27,7 +27,7 @@ public enum UnixSocketError: Error, CustomStringConvertible {
     }
 }
 
-/// 把 sockaddr_un 准备好。
+/// Prepares a sockaddr_un.
 private func makeUnixAddr(path: String) throws -> (sockaddr_un, socklen_t) {
     var addr = sockaddr_un()
     addr.sun_family = sa_family_t(AF_UNIX)
@@ -49,7 +49,7 @@ private func makeUnixAddr(path: String) throws -> (sockaddr_un, socklen_t) {
 
 // MARK: - Server
 
-/// Unix socket server。每条连接 = 一次 newline-delimited JSON 请求/响应。
+/// Unix socket server. One connection = one newline-delimited JSON request/response.
 public final class UnixSocketServer: @unchecked Sendable {
     public typealias Handler = (Data) -> Data
 
@@ -65,7 +65,7 @@ public final class UnixSocketServer: @unchecked Sendable {
     }
 
     public func start() throws {
-        // 清理旧的 socket 文件
+        // Remove any stale socket file
         try? FileManager.default.removeItem(atPath: path)
 
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
@@ -104,7 +104,7 @@ public final class UnixSocketServer: @unchecked Sendable {
                 Thread.sleep(forTimeInterval: 0.05)
                 continue
             }
-            // 每个连接独立线程处理
+            // Each connection gets its own thread
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
                 self?.handle(connection: conn)
             }
@@ -114,7 +114,7 @@ public final class UnixSocketServer: @unchecked Sendable {
     private func handle(connection: Int32) {
         defer { close(connection) }
 
-        // 读到 \n 为止
+        // Read up to \n
         var buffer = Data()
         var chunk = [UInt8](repeating: 0, count: 4096)
         var found = false
@@ -125,14 +125,14 @@ public final class UnixSocketServer: @unchecked Sendable {
             if buffer.contains(0x0A) { found = true }
         }
 
-        // 取第一行
+        // Take the first line
         guard let nlIdx = buffer.firstIndex(of: 0x0A) else { return }
         let request = buffer.prefix(nlIdx)
 
-        // 调 handler
+        // Call the handler
         let response = handler(Data(request))
 
-        // 写回 + \n
+        // Write back + \n
         var resp = response
         resp.append(0x0A)
         var sent = 0
@@ -159,7 +159,7 @@ public final class UnixSocketServer: @unchecked Sendable {
 // MARK: - Client
 
 public enum UnixSocketClient {
-    /// 同步发送 + 接收单条 newline-delimited JSON。
+    /// Synchronously send + receive one newline-delimited JSON message.
     public static func sendAndReceive(
         path: String,
         message: Data,
@@ -169,7 +169,7 @@ public enum UnixSocketClient {
         guard fd >= 0 else { throw UnixSocketError.createFailed(errno) }
         defer { close(fd) }
 
-        // 设置 send/recv 超时
+        // Set send/recv timeouts
         let secs = Int(timeout)
         let usecs = Int32((timeout - Double(secs)) * 1_000_000)
         var tv = timeval(tv_sec: secs, tv_usec: usecs)
@@ -187,7 +187,7 @@ public enum UnixSocketClient {
             throw UnixSocketError.connectFailed(errno)
         }
 
-        // 发 message + \n
+        // Send message + \n
         var payload = message
         payload.append(0x0A)
         var sent = 0
@@ -206,7 +206,7 @@ public enum UnixSocketClient {
             }
         }
 
-        // 读到 \n
+        // Read up to \n
         var buffer = Data()
         var chunk = [UInt8](repeating: 0, count: 4096)
         while true {

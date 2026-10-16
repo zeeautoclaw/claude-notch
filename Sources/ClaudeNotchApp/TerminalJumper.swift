@@ -1,11 +1,11 @@
 import Foundation
 import AppKit
 
-/// 通过 AppleScript 把指定 terminal 拉到前台并跳到对应 session/tab。
+/// Uses AppleScript to bring the terminal forward and jump to the matching session/tab.
 public enum TerminalJumper {
     private static let logger = Logger(tag: "jumper")
 
-    /// 根据 hook event 的 env 信息选择策略并执行。失败仅日志,不抛错。
+    /// Picks a strategy from the hook event's env and runs it. Failures are only logged.
     public static func jump(to event: HookEvent) {
         let termProgram = event.env["TERM_PROGRAM"] ?? ""
         switch termProgram {
@@ -26,7 +26,7 @@ public enum TerminalJumper {
             activate(bundleId: "com.googlecode.iterm2")
             return
         }
-        // iTerm2 的 session 唯一 ID 包含 ITERM_SESSION_ID 环境变量值的最后一段
+        // The iTerm2 session unique ID contains the last part of ITERM_SESSION_ID
         let cleanSid = sid.split(separator: ":").last.map(String.init) ?? sid
         let script = """
         tell application "iTerm"
@@ -56,7 +56,7 @@ public enum TerminalJumper {
     // MARK: - Terminal.app
 
     static func jumpAppleTerminal(sessionID: String?) {
-        // Terminal.app 没暴露 session id 查询,仅 activate
+        // Terminal.app does not expose session IDs, so only activate it
         let script = """
         tell application "Terminal"
             activate
@@ -65,7 +65,7 @@ public enum TerminalJumper {
         runScript(script)
     }
 
-    // MARK: - 通用
+    // MARK: - Common
 
     private static func activate(bundleId: String) {
         guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) else {
@@ -91,14 +91,14 @@ public enum TerminalJumper {
         return result.stringValue
     }
 
-    // MARK: - 写入文本到 iTerm session (AskUserQuestion 自动作答)
+    // MARK: - Type text into an iTerm session (auto-answer AskUserQuestion)
 
-    /// 把 text 写到 iTerm 指定 session(等价于在终端里手敲)。
-    /// 如果不是 iTerm 或找不到 session,fallback 到剪贴板 + 提示用户粘贴。
+    /// Types text into the given iTerm session (same as typing in the terminal).
+    /// Falls back to the clipboard + a paste hint if it is not iTerm or the session is not found.
     public static func type(text: String, into event: HookEvent) {
-        // 我们手动发 \r (CR) 作为 Enter — Claude Code 的 TUI 需要 CR 才认。
-        // AppleScript 字符串字面量转义: \, "
-        // 真实 \n / \r 转义成 AppleScript 字面量 \r (Claude TUI 要 CR)。
+        // We send \r (CR) ourselves as Enter — the Claude Code TUI needs CR.
+        // Escape for an AppleScript string literal: \, "
+        // Real \n / \r become the AppleScript literal \r (the Claude TUI wants CR).
         let escaped = text
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
@@ -109,7 +109,7 @@ public enum TerminalJumper {
         if event.env["TERM_PROGRAM"] == "iTerm.app",
            let sid = event.env["ITERM_SESSION_ID"] {
             let cleanSid = sid.split(separator: ":").last.map(String.init) ?? sid
-            // newline NO: 让我们自己控制,不让 iTerm 自动追加 \n
+            // newline NO: we control line endings; do not let iTerm append \n
             let script = """
             tell application "iTerm"
                 activate
@@ -140,7 +140,7 @@ public enum TerminalJumper {
             }
             return
         }
-        // 其他终端 → 复制到剪贴板,提示用户 ⌘V + Enter
+        // Other terminals → copy to clipboard and ask the user to press ⌘V + Enter
         fallbackClipboard(text)
     }
 

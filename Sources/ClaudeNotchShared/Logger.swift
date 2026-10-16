@@ -1,6 +1,6 @@
 import Foundation
 
-/// 简单的文件 + stderr logger。线程安全。
+/// Simple file + stderr logger. Thread-safe.
 public final class Logger: @unchecked Sendable {
     public static let shared = Logger(tag: "app")
 
@@ -21,7 +21,7 @@ public final class Logger: @unchecked Sendable {
             // stderr
             FileHandle.standardError.write(Data(line.utf8))
 
-            // 文件
+            // File
             let path = Paths.logFile
             if !FileManager.default.fileExists(atPath: path) {
                 FileManager.default.createFile(atPath: path, contents: nil)

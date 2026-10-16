@@ -2,15 +2,15 @@ import Foundation
 
 public struct AllowRule: Codable, Equatable, Identifiable {
     public enum Scope: String, Codable {
-        case tool                // 全部该工具
-        case toolWithCommand     // 该工具 + 命令前缀
-        case project             // cwd 在某个目录下
+        case tool                // the whole tool
+        case toolWithCommand     // tool + command prefix
+        case project             // cwd inside a folder
     }
 
     public var id: UUID
     public var scope: Scope
     public var value: String
-    public var label: String     // 给用户看的描述
+    public var label: String     // description shown to the user
     public var createdAt: Date
 
     public init(

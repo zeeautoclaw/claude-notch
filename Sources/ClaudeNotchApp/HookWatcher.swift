@@ -1,9 +1,9 @@
 import Foundation
 
-/// 监控 ~/.claude/settings.json,被其他工具改写后自动恢复我们的 hook。
+/// Watches ~/.claude/settings.json and restores our hooks if another tool rewrites it.
 ///
-/// 实现方式: 文件 mtime 轮询 (3 秒间隔) — FSEvents 在隐藏目录里时灵时不灵,
-/// 简单的 mtime 检查更可靠且开销 < 1ms/次。
+/// Implementation: polls the file mtime every 3 seconds — FSEvents is unreliable in hidden folders,
+/// and a simple mtime check is more reliable and costs < 1 ms per check.
 public final class HookWatcher {
     private let injector: SettingsInjector
     private let logger = Logger(tag: "watcher")
@@ -48,13 +48,13 @@ public final class HookWatcher {
         let path = injector.settingsPath
         let mtime = (try? FileManager.default.attributesOfItem(atPath: path)[.modificationDate]) as? Date
 
-        // 文件没变 → 跳过
+        // File unchanged → skip
         if let last = lastSeenMtime, last == mtime {
             return
         }
         lastSeenMtime = mtime
 
-        // cooldown — 自己刚写过
+        // Cooldown — we just wrote it ourselves
         if let last = lastRestoreAt, Date().timeIntervalSince(last) < cooldown {
             return
         }
@@ -72,7 +72,7 @@ public final class HookWatcher {
             }
             return
         }
-        // 60 秒后自动解禁
+        // Re-enable automatically after 60 seconds
         if rateLimited, let last = restoreTimes.last,
            now.timeIntervalSince(last) > rateLimitWindow {
             rateLimited = false
@@ -87,7 +87,7 @@ public final class HookWatcher {
                 restoreTimes.append(Date())
                 restoreCount += 1
                 logger.info("hook restored (total: \(restoreCount))")
-                // 更新 mtime 避免下一 tick 又触发
+                // Update mtime so the next tick does not fire again
                 lastSeenMtime = (try? FileManager.default.attributesOfItem(atPath: path)[.modificationDate]) as? Date
             }
         } catch {

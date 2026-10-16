@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// 菜单栏图标 + popover (替代了原来的 NSMenu)。
+/// Menu bar icon + popover (replaces the old NSMenu).
 public final class MenuBarController: NSObject, NSPopoverDelegate {
     private let statusItem: NSStatusItem
     private let popover: NSPopover
@@ -97,31 +97,31 @@ public final class MenuBarController: NSObject, NSPopoverDelegate {
     private func installHooks() {
         do {
             try injector.install()
-            alert(title: "Hook 已安装",
-                  info: "重启正在运行的 claude session 后生效。")
+            alert(title: "Hooks installed",
+                  info: "Restart any running claude session for them to take effect.")
         } catch {
-            alert(title: "安装失败", info: "\(error)", style: .warning)
+            alert(title: "Install failed", info: "\(error)", style: .warning)
         }
-        // 重新打开 popover 刷新状态
+        // Reopen the popover to refresh its state
         popover.performClose(nil)
     }
 
     private func uninstallHooks() {
-        // 暂停 watcher,避免它立刻把 hook 装回去
+        // Pause the watcher so it does not put the hooks straight back
         watcher?.enabled = false
         do {
             try injector.uninstall()
-            alert(title: "Hook 已卸载",
-                  info: "settings.json 已恢复 Claude Notch 之前的状态。Hook Watcher 自愈也已关闭(不会自动装回)。")
+            alert(title: "Hooks removed",
+                  info: "settings.json is back to how it was before Claude Notch. Hook self-healing is off (it will not reinstall them).")
         } catch {
-            alert(title: "卸载失败", info: "\(error)", style: .warning)
+            alert(title: "Uninstall failed", info: "\(error)", style: .warning)
             watcher?.enabled = true
         }
         popover.performClose(nil)
     }
 
     private func installHooksFromMenu() {
-        // 重新装 → 重新启用 watcher
+        // Reinstall → re-enable the watcher
         installHooks()
         watcher?.enabled = true
     }

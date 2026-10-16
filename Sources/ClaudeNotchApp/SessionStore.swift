@@ -3,38 +3,38 @@ import SwiftUI
 
 public enum SessionStatus: String, Codable {
     case running
-    case waiting   // PreToolUse 等待用户审批
+    case waiting   // PreToolUse waiting for approval
     case done
 }
 
 public struct SessionInfo: Identifiable, Equatable {
     public var id: String                 // sessionFingerprint
-    public var title: String              // 项目目录名 / 用户标题
-    public var lastUserPrompt: String     // 最近一次 UserPromptSubmit
-    public var lastToolName: String?      // 最近一次工具名
-    public var lastToolPreview: String?   // 最近一次命令片段
+    public var title: String              // project folder name / user title
+    public var lastUserPrompt: String     // latest UserPromptSubmit
+    public var lastToolName: String?      // latest tool name
+    public var lastToolPreview: String?   // latest command snippet
     public var status: SessionStatus
     public var startedAt: Date
     public var lastActivityAt: Date
     public var doneAt: Date?
     public var termProgram: String
     public var cwd: String
-    public var env: [String: String]      // 留 ITERM_SESSION_ID 等用于跳转
-    public var claudePID: Int?            // relay 的 ppid,用来 SIGTERM
+    public var env: [String: String]      // keeps ITERM_SESSION_ID etc. for jumping
+    public var claudePID: Int?            // relay's ppid, used for SIGTERM
 
     public var isDone: Bool { status == .done }
 }
 
-/// 跨 session 状态总览。HookServer 把所有事件喂进来,UI 订阅展示。
+/// Overview of all sessions. HookServer feeds every event in; the UI subscribes.
 public final class SessionStore: ObservableObject {
     @Published public private(set) var sessions: [String: SessionInfo] = [:]
     private let logger = Logger(tag: "sessions")
 
-    /// 完成 30 分钟后自动从列表移除。
+    /// Finished sessions are removed from the list after 30 minutes.
     public var doneRetention: TimeInterval = 30 * 60
 
     public init() {
-        // 定时清理已完成、已超期的 session
+        // Periodically drop finished, expired sessions
         Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             self?.gc()
         }
@@ -43,7 +43,7 @@ public final class SessionStore: ObservableObject {
     public var sortedActive: [SessionInfo] {
         sessions.values
             .sorted { lhs, rhs in
-                // running > waiting > done; 同状态按 lastActivityAt 降序
+                // running > waiting > done; same state sorted by lastActivityAt, newest first
                 if lhs.status != rhs.status {
                     return rank(lhs.status) < rank(rhs.status)
                 }
@@ -59,7 +59,7 @@ public final class SessionStore: ObservableObject {
         }
     }
 
-    // MARK: - 事件入口
+    // MARK: - Event entry point
 
     public func ingest(_ event: HookEvent, isWaiting: Bool = false) {
         DispatchQueue.main.async {
@@ -87,7 +87,7 @@ public final class SessionStore: ObservableObject {
             claudePID: event.ppid
         )
         info.lastActivityAt = now
-        info.env = event.env  // 持续刷新 (TERM_SESSION_ID 可能变)
+        info.env = event.env  // keep refreshing (TERM_SESSION_ID may change)
         info.cwd = event.cwd
         if info.termProgram == "Unknown" {
             info.termProgram = event.env["TERM_PROGRAM"] ?? "Unknown"
@@ -122,7 +122,7 @@ public final class SessionStore: ObservableObject {
         sessions[id] = info
     }
 
-    /// 标记一次 PreToolUse 等待状态结束(收到决策时)。
+    /// Mark a PreToolUse wait as finished (when the decision arrives).
     public func markResolved(_ event: HookEvent) {
         DispatchQueue.main.async {
             guard var info = self.sessions[event.sessionFingerprint] else { return }
@@ -158,7 +158,7 @@ public final class SessionStore: ObservableObject {
         }
     }
 
-    // MARK: - 标题推断
+    // MARK: - Title inference
 
     private func defaultTitle(cwd: String) -> String {
         let parts = cwd.split(separator: "/")
@@ -167,7 +167,7 @@ public final class SessionStore: ObservableObject {
     }
 }
 
-// MARK: - 时长格式化
+// MARK: - Duration formatting
 
 public enum DurationFormatter {
     public static func short(_ interval: TimeInterval) -> String {

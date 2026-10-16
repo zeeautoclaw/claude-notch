@@ -1,6 +1,6 @@
-// 测试 runner — 不依赖 XCTest (CLT-only 环境用不了 xctest)。
-// 编译: 把 Sources/ClaudeNotchShared/*.swift + 本文件一起喂给 swiftc。
-// 退出码: 0 = 全过, 非 0 = 有失败。
+// Test runner — no XCTest dependency.
+// Build: pass Sources/ClaudeNotchShared/*.swift plus this file to swiftc.
+// Exit code: 0 = all passed, non-zero = failures.
 
 import Foundation
 
@@ -48,11 +48,11 @@ do {
 
 section("HookResponse JSON")
 do {
-    // 默认 (非 PreToolUse) - 简单格式
+    // Default (non-PreToolUse) - simple format
     let allow = HookResponse(id: UUID(), decision: .allow)
     check("allow json (default)", allow.toClaudeJSON() == #"{"continue":true}"#)
 
-    // PreToolUse - 必须含 permissionDecision 才能跳过原生审批
+    // PreToolUse - must include permissionDecision to skip the native prompt
     let allowPre = allow.toClaudeJSON(eventName: "PreToolUse")
     check("allow PreToolUse contains permissionDecision allow",
           allowPre.contains("\"permissionDecision\":\"allow\""))
@@ -64,7 +64,7 @@ do {
           denyPre.contains("\"permissionDecision\":\"deny\""))
     check("deny PreToolUse contains reason", denyPre.contains("no way"))
 
-    // askUser 不带 hookSpecificOutput,让 Claude 自己问
+    // askUser has no hookSpecificOutput so Claude asks on its own
     let ask = HookResponse(id: UUID(), decision: .askUser)
     check("askUser PreToolUse no hookSpecificOutput",
           !ask.toClaudeJSON(eventName: "PreToolUse").contains("hookSpecificOutput"))
@@ -158,7 +158,7 @@ do {
     }
     check("original hook preserved", hasOriginal)
 
-    // 卸载应保留原 hook
+    // Uninstall should keep the original hook
     try inj.uninstall()
     let bk2 = try Data(contentsOf: URL(fileURLWithPath: dir + "settings.json"))
     let r2 = try JSONSerialization.jsonObject(with: bk2) as! [String: Any]
@@ -245,7 +245,7 @@ do {
         check("safe: \(c)", !Safety.isDangerous(bash(c)))
     }
 
-    // 没有 command 字段的工具 (比如提议新会话的长文本) 不按命令判断
+    // Tools without a command field (e.g. long prose when proposing a session) are not judged as commands
     let prose = HookEvent(event: "PreToolUse",
                           payload: .object(["tool_name": .string("mcp__ccd_session__start_session"),
                                             "tool_input": .object(["prompt": .string("Please add tests, then sudo nothing")])]),
@@ -254,11 +254,11 @@ do {
 
     check("raw text check catches rm -rf", Safety.isDangerousCommand(#"{"command":"rm -rf /tmp/x"}"#))
 
-    let denyTool = HookResponse(id: UUID(), decision: .denyTool, reason: "有风险,已自动拒绝")
+    let denyTool = HookResponse(id: UUID(), decision: .denyTool, reason: "Risky, denied automatically")
         .toClaudeJSON(eventName: "PreToolUse")
     check("denyTool keeps session going", denyTool.contains("\"continue\":true"))
     check("denyTool blocks the tool", denyTool.contains("\"permissionDecision\":\"deny\""))
-    check("denyTool passes reason", denyTool.contains("已自动拒绝"))
+    check("denyTool passes reason", denyTool.contains("denied automatically"))
     check("denyTool is valid JSON",
           (try? JSONSerialization.jsonObject(with: Data(denyTool.utf8))) != nil)
     check("firstWord basename", Safety.firstWord(of: "/usr/bin/cat foo") == "cat")

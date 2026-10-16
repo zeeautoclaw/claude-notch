@@ -1,6 +1,6 @@
 import Foundation
 
-/// 用于解析 / 转发任意 JSON 结构的 payload。
+/// Parses / forwards payloads with any JSON structure.
 public enum AnyCodable: Codable, Equatable, Sendable {
     case null
     case bool(Bool)
@@ -29,7 +29,7 @@ public enum AnyCodable: Codable, Equatable, Sendable {
         } else {
             throw DecodingError.dataCorruptedError(
                 in: container,
-                debugDescription: "AnyCodable: 无法识别的 JSON 类型"
+                debugDescription: "AnyCodable: unrecognized JSON type"
             )
         }
     }
@@ -79,7 +79,7 @@ public enum AnyCodable: Codable, Equatable, Sendable {
         objectValue?[key]
     }
 
-    /// 把任意值平铺成展示字符串。
+    /// Flattens any value into a display string.
     public var displayString: String {
         switch self {
         case .null: return "null"

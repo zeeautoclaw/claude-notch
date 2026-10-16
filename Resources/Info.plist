@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleDevelopmentRegion</key>
-    <string>zh-Hans</string>
+    <string>en</string>
     <key>CFBundleDisplayName</key>
     <string>Claude Notch</string>
     <key>CFBundleExecutable</key>
@@ -23,7 +23,7 @@
     <key>LSUIElement</key>
     <true/>
     <key>NSAppleEventsUsageDescription</key>
-    <string>Claude Notch 需要控制终端 (iTerm2、Terminal) 来跳到等待审批的 session。</string>
+    <string>Claude Notch controls your terminal (iTerm2, Terminal) to jump to the session waiting for approval.</string>
     <key>NSHighResolutionCapable</key>
     <true/>
 </dict>

@@ -1,54 +1,53 @@
 # Claude Notch
 
-> 在屏幕顶部审批 Claude Code 的操作，不用切回终端。
-> Approve Claude Code tool calls from a floating Liquid Glass card at the top of your Mac screen.
+> Approve Claude Code tool calls from a floating Liquid Glass card at the top of your Mac screen — no switching back to the terminal.
 
 <p>
-  <img src="docs/card-normal.png" width="380" alt="普通审批卡片">
-  <img src="docs/card-risky.png" width="380" alt="有风险的命令">
+  <img src="docs/card-normal.png" width="380" alt="Approval card">
+  <img src="docs/card-risky.png" width="380" alt="Risky command card">
 </p>
 
-个人业余作品，按原样提供，不保证维护。中文界面。
+A personal side project, provided as is, with no promise of maintenance.
 
-## 它做什么
+## What it does
 
-- Claude Code 要执行工具时，屏幕顶部弹出一张卡片：**拒绝 / 允许 / 总是允许此工具 / 到终端**。
-- **风险命令单独对待**：`sudo`、`rm -rf`、强制推送 `git push --force`、`git reset --hard`、`dd`、`mkfs`、`diskutil`、下载非本机地址的 `curl`/`wget` 等：
-  - 即使你设过"总是允许"，也一定弹卡片；
-  - 卡片是橙色的，不能"总是允许"；
-  - 约 50 秒没人处理就**自动拒绝**，只拦下这一条命令，并告诉 Claude 原因，会话不会被停掉。
-- 普通命令没人处理，约 50 秒后自动放行，避免你离开电脑时工作卡住。
-- Plan 模式的计划、`AskUserQuestion` 的选项也能在卡片里直接处理。
+- When Claude Code wants to use a tool, a card appears at the top of the screen: **Deny / Allow / Always allow this tool / Go to terminal**.
+- **Risky commands get special treatment**: `sudo`, `rm -rf`, `git push --force`, `git reset --hard`, `dd`, `mkfs`, `diskutil`, `curl`/`wget` to non-local addresses, and similar:
+  - a card always appears, even if you set "Always allow" for that tool;
+  - the card is orange and cannot be "always allowed";
+  - if nobody answers within about 50 seconds it is **denied automatically**. Only that one command is blocked; Claude is told why and the session keeps going.
+- Ordinary commands that nobody answers are allowed after about 50 seconds, so work does not stall while you are away.
+- Plans (plan mode) and `AskUserQuestion` choices can also be handled from the card.
 
-## 环境要求
+## Requirements
 
-- Apple Silicon Mac，macOS 27
-- 完整 Xcode（用来编译 SwiftUI；只有命令行工具不够）
+- Apple Silicon Mac, macOS 27
+- Full Xcode (needed to compile SwiftUI; the Command Line Tools alone are not enough)
 - Claude Code CLI
 
-## 安装
+## Install
 
 ```bash
 git clone https://github.com/zeeautoclaw/claude-notch.git
 cd claude-notch
-./Scripts/build.sh          # 编译
-./Scripts/package-app.sh    # 打包成 .app（本机自签名）
+./Scripts/build.sh          # compile
+./Scripts/package-app.sh    # package as a .app (ad-hoc signed)
 mv "build/Claude Notch.app" /Applications/
 open "/Applications/Claude Notch.app"
 ```
 
-请用 `Scripts/build.sh` 编译；`swift build` 目前不支持（源码按单模块方式组织）。
+Build with `Scripts/build.sh`; `swift build` is not supported (the sources are organized as a single module).
 
-没有苹果开发者签名。第一次打开如果被拦，在 Finder 里右键 → 打开，同意一次即可。
+The app is not signed with an Apple Developer ID. If macOS blocks it the first time, right-click it in Finder → Open, and confirm once.
 
-然后点菜单栏图标 → **安装 Hook**。它会：
+Then click the menu bar icon → **Install Hooks**. This:
 
-- 备份 `~/.claude/settings.json` 到 `~/.claude/settings.json.claude-notch.bak`
-- 只添加自己的 4 条 hook（PreToolUse / Notification / Stop / UserPromptSubmit），其他配置不动
+- backs up `~/.claude/settings.json` to `~/.claude/settings.json.claude-notch.bak`
+- adds only its own 4 hooks (PreToolUse / Notification / Stop / UserPromptSubmit) and leaves everything else alone
 
-装好后重启正在运行的 `claude` 会话，新 hook 才会生效。
+Restart any running `claude` session afterwards so it picks up the new hooks.
 
-### 开机自动启动（可选）
+### Launch at login (optional)
 
 ```bash
 cat > ~/Library/LaunchAgents/local.claudenotch.plist <<'EOF'
@@ -65,53 +64,55 @@ EOF
 launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/local.claudenotch.plist
 ```
 
-## 工作原理
+## How it works
 
 ```
-Claude Code 触发 hook
-  → ~/.claude/settings.json 里的命令启动 ClaudeNotchRelay
-  → Relay 通过 Unix socket 把事件发给 ClaudeNotchApp
-  → App 判断：命中"总是允许"且不是风险命令 → 直接放行；否则弹卡片
-  → 你点按钮（或超时）→ 结果原路返回给 Claude Code
+Claude Code fires a hook
+  → the command in ~/.claude/settings.json starts ClaudeNotchRelay
+  → the relay sends the event to ClaudeNotchApp over a Unix socket
+  → the app decides: matches "Always allow" and not risky → allow; otherwise show a card
+  → you click (or it times out) → the decision goes back to Claude Code
 ```
 
-**设计上偏向"不卡住工作"**：App 没在运行、socket 出错、Relay 等待超过 60 秒时，Relay 会直接放行，这时由 Claude Code 自己的权限设置把关。
+**It is designed not to block your work**: if the app is not running, the socket fails, or the relay waits more than 60 seconds, the relay allows the call and Claude Code's own permission settings take over.
 
-## "总是允许"规则
+The risk check is a fixed list of patterns in [`Safety.swift`](Sources/ClaudeNotchShared/Safety.swift) — plain code, no AI and no network. It is an extra reminder layer, not a security boundary: a command written to avoid the patterns will not be flagged.
 
-存在 `~/Library/Application Support/ClaudeNotch/rules.json`，可以直接编辑。风险命令不受这些规则影响。
+## "Always allow" rules
 
-## 跳回终端
+Stored in `~/Library/Application Support/ClaudeNotch/rules.json`; you can edit the file directly. Risky commands ignore these rules.
 
-| 终端 | 支持 |
+## Jump to terminal
+
+| Terminal | Support |
 |---|---|
-| iTerm2 | 跳到对应会话（匹配 `ITERM_SESSION_ID`） |
-| Terminal.app | 只能把窗口带到前面 |
+| iTerm2 | Jumps to the matching session (via `ITERM_SESSION_ID`) |
+| Terminal.app | Brings the window forward only |
 
-需要 macOS 的"自动化"权限：系统设置 → 隐私与安全性 → 自动化。
+Needs macOS Automation permission: System Settings → Privacy & Security → Automation.
 
-## 测试
+## Tests
 
 ```bash
-# 单元测试
+# unit tests
 xcrun swiftc -O -target arm64-apple-macos27.0 -o build/TestRunner \
     Sources/ClaudeNotchShared/*.swift Tests/Runner/main.swift
 ./build/TestRunner
 
-# 端到端冒烟（不需要真的 Claude）
+# end-to-end smoke test (no real Claude needed)
 ./Scripts/smoke.sh
 ```
 
-## 故障排查
+## Troubleshooting
 
-| 现象 | 处理 |
+| Symptom | Fix |
 |---|---|
-| 不弹卡片 | 菜单栏看是否"已注入"；重启 `claude` 会话；看日志 `~/Library/Logs/ClaudeNotch/app.log` |
-| "到终端"没反应 | 检查"自动化"权限 |
-| 打开时提示"已损坏" | `xattr -dr com.apple.quarantine "/Applications/Claude Notch.app"` |
-| 改了代码要重新部署 | `./Scripts/redeploy.sh` |
+| No cards appear | Check the menu bar shows "Hooks installed"; restart the `claude` session; read `~/Library/Logs/ClaudeNotch/app.log` |
+| "Go to terminal" does nothing | Check the Automation permission |
+| macOS says the app is damaged | `xattr -dr com.apple.quarantine "/Applications/Claude Notch.app"` |
+| Redeploy after changing code | `./Scripts/redeploy.sh` |
 
-## 卸载
+## Uninstall
 
 ```bash
 "/Applications/Claude Notch.app/Contents/MacOS/ClaudeNotchApp" --uninstall-hooks
@@ -119,14 +120,14 @@ rm -rf "/Applications/Claude Notch.app"
 rm -rf ~/Library/Application\ Support/ClaudeNotch ~/Library/Logs/ClaudeNotch
 ```
 
-## 类似的项目
+## Similar projects
 
-这个方向已经有不少成熟的开源工具，功能更多、支持更多 AI 编程工具，可以对比着选：
-[Casement](https://github.com/aviralgarg05/casement)、
-[Coucou](https://github.com/Louis-CFM/coucou)、
-[Vibe Notch](https://github.com/farouqaldori/vibe-notch)、
-[notch-for-claude-code](https://github.com/deDavil/notch-for-claude-code)。
+There are several more mature open-source tools in this space that support more coding agents — worth comparing:
+[Casement](https://github.com/aviralgarg05/casement),
+[Coucou](https://github.com/Louis-CFM/coucou),
+[Vibe Notch](https://github.com/farouqaldori/vibe-notch),
+[notch-for-claude-code](https://github.com/deDavil/notch-for-claude-code).
 
 ## License
 
-MIT，见 [LICENSE](LICENSE)。与 Anthropic 无关。
+MIT — see [LICENSE](LICENSE). Not affiliated with Anthropic.

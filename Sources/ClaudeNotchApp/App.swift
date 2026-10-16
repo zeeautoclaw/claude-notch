@@ -23,7 +23,7 @@ struct ClaudeNotchAppEntry {
         app.delegate = delegate
         app.setActivationPolicy(.accessory)
 
-        // 捕获 SIGTERM/SIGINT,转给 NSApp 完成清理
+        // Catch SIGTERM/SIGINT and hand them to NSApp so cleanup runs
         installSignalHandler(SIGTERM)
         installSignalHandler(SIGINT)
 
@@ -33,7 +33,7 @@ struct ClaudeNotchAppEntry {
     static func defaultRelayPath() -> String {
         let exePath = Bundle.main.executablePath ?? CommandLine.arguments[0]
         let exeDir = (exePath as NSString).deletingLastPathComponent
-        // .app/Contents/Helpers/ClaudeNotchRelay 或 同目录的 ClaudeNotchRelay
+        // .app/Contents/Helpers/ClaudeNotchRelay, or ClaudeNotchRelay next to the binary
         let helper = exeDir + "/../Helpers/ClaudeNotchRelay"
         if FileManager.default.fileExists(atPath: helper) {
             return URL(fileURLWithPath: helper).standardized.path
@@ -46,11 +46,11 @@ struct ClaudeNotchAppEntry {
         let inj = SettingsInjector(relayPath: defaultRelayPath())
         do {
             try inj.install()
-            print("✅ Hook 已注入到 \(inj.settingsPath)")
+            print("✅ Hooks installed in \(inj.settingsPath)")
             print("   relay: \(inj.relayPath)")
-            print("   备份: \(inj.backupPath)")
+            print("   Backup: \(inj.backupPath)")
         } catch {
-            FileHandle.standardError.write(Data("❌ 注入失败: \(error)\n".utf8))
+            FileHandle.standardError.write(Data("❌ Install failed: \(error)\n".utf8))
             exit(1)
         }
     }
@@ -59,9 +59,9 @@ struct ClaudeNotchAppEntry {
         let inj = SettingsInjector(relayPath: defaultRelayPath())
         do {
             try inj.uninstall()
-            print("✅ Hook 已移除")
+            print("✅ Hooks removed")
         } catch {
-            FileHandle.standardError.write(Data("❌ 移除失败: \(error)\n".utf8))
+            FileHandle.standardError.write(Data("❌ Uninstall failed: \(error)\n".utf8))
             exit(1)
         }
     }
@@ -79,9 +79,9 @@ struct ClaudeNotchAppEntry {
             NSApp.terminate(nil)
         }
         src.resume()
-        // 让 system 不杀进程,交给 dispatch
+        // Keep the default handler from killing the process; dispatch handles it
         signal(signo, SIG_IGN)
-        // 留住 src — DispatchSource 释放就停了
+        // Keep a reference to src — the DispatchSource stops when released
         SignalSourceKeeper.shared.add(src)
     }
 }
@@ -103,12 +103,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let logger = Logger(tag: "app")
 
     private var relayPath: String {
-        // 优先使用 .app 内的 relay; 否则用 PATH
+        // Prefer the relay inside the .app; otherwise use PATH
         let bundleHelper = Bundle.main.bundlePath + "/Contents/Helpers/ClaudeNotchRelay"
         if FileManager.default.fileExists(atPath: bundleHelper) {
             return bundleHelper
         }
-        // 开发环境: 同目录的 .build/release/ClaudeNotchRelay
+        // Development: .build/release/ClaudeNotchRelay next to the binary
         let exePath = Bundle.main.executablePath ?? ""
         let exeDir = (exePath as NSString).deletingLastPathComponent
         let dev = "\(exeDir)/ClaudeNotchRelay"
@@ -133,8 +133,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } catch {
             logger.error("server start failed: \(error)")
             let a = NSAlert()
-            a.messageText = "Claude Notch 启动失败"
-            a.informativeText = "无法监听 socket: \(error)"
+            a.messageText = "Claude Notch failed to start"
+            a.informativeText = "Could not listen on the socket: \(error)"
             a.alertStyle = .critical
             a.runModal()
             NSApp.terminate(nil)
@@ -144,13 +144,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Notch UI
         presenter = NotchPresenter(queue: queue, rules: rules)
 
-        // Hook 自愈监视器
+        // Hook self-healing watcher
         let w = HookWatcher(injector: injector)
         w.onRateLimited = {
             DispatchQueue.main.async {
                 let a = NSAlert()
-                a.messageText = "Hook 反复被覆盖"
-                a.informativeText = "短时间内 Hook 被外部工具反复修改。已暂停自愈。请手动检查 ~/.claude/settings.json,或菜单栏卸载 + 重装。"
+                a.messageText = "Hooks keep getting overwritten"
+                a.informativeText = "Another tool keeps changing the hooks. Self-healing is paused. Check ~/.claude/settings.json, or uninstall and reinstall from the menu bar."
                 a.alertStyle = .warning
                 a.runModal()
             }
@@ -158,7 +158,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         w.start()
         self.watcher = w
 
-        // 菜单栏 + popover
+        // Menu bar + popover
         let mb = MenuBarController(
             injector: injector,
             sessions: sessions,
@@ -197,24 +197,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func killSession(_ info: SessionInfo) {
         guard let pid = info.claudePID else {
             let a = NSAlert()
-            a.messageText = "无法结束"
-            a.informativeText = "没拿到 PID — 这个 session 可能太老,或者从来没触发过 hook。"
+            a.messageText = "Cannot end session"
+            a.informativeText = "No PID recorded — the session may be too old, or it never triggered a hook."
             a.alertStyle = .warning
             a.runModal()
             return
         }
 
         let alert = NSAlert()
-        alert.messageText = "结束这个 claude session?"
+        alert.messageText = "End this claude session?"
         alert.informativeText = """
-        会向进程 \(pid) 发 SIGTERM。
+        Sends SIGTERM to process \(pid).
         Session: \(info.title)
-        路径: \(info.cwd)
+        Folder: \(info.cwd)
         """
         alert.alertStyle = .warning
-        alert.addButton(withTitle: "结束 (SIGTERM)")
-        alert.addButton(withTitle: "强制结束 (SIGKILL)")
-        alert.addButton(withTitle: "取消")
+        alert.addButton(withTitle: "End (SIGTERM)")
+        alert.addButton(withTitle: "Force End (SIGKILL)")
+        alert.addButton(withTitle: "Cancel")
 
         let resp = alert.runModal()
         switch resp {
@@ -236,8 +236,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let err = String(cString: strerror(errno))
             logger.warn("kill failed pid=\(pid) signal=\(signal) errno=\(errno) (\(err))")
             let a = NSAlert()
-            a.messageText = "结束失败"
-            a.informativeText = "PID \(pid): \(err)\n\n可能进程已经退出,或者 PID 实际指向 shell 的祖先而不是 claude 本身。"
+            a.messageText = "Could not end session"
+            a.informativeText = "PID \(pid): \(err)\n\nThe process may have already exited, or the PID points to a parent shell rather than claude itself."
             a.alertStyle = .warning
             a.runModal()
         }
@@ -249,7 +249,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             payload: .object([
                 "tool_name": .string("Bash"),
                 "tool_input": .object([
-                    "command": .string("演示卡片: rm -rf /tmp/foo (这是个演示)")
+                    "command": .string("Demo card: rm -rf /tmp/foo (this is only a demo)")
                 ])
             ]),
             env: ["TERM_PROGRAM": "iTerm.app", "ITERM_SESSION_ID": "demo:demo"],
@@ -257,7 +257,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         let req = ApprovalRequest(event: demoEvent)
         queue.enqueue(req)
-        // 5 秒后自动消失 (避免演示卡死队列)
+        // Dismiss automatically after a while so the demo cannot block the queue
         DispatchQueue.global().asyncAfter(deadline: .now() + 25) { [weak self] in
             if !req.isResolved {
                 self?.queue.resolve(id: req.id, decision: .allow, reason: "demo timeout")

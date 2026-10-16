@@ -1,6 +1,6 @@
 import Foundation
 
-/// Claude Code hook 事件类型。我们关心的子集。
+/// Claude Code hook event types — the subset we care about.
 public enum HookEventType: String, Codable, Sendable {
     case preToolUse = "PreToolUse"
     case postToolUse = "PostToolUse"
@@ -12,15 +12,15 @@ public enum HookEventType: String, Codable, Sendable {
     case unknown
 }
 
-/// relay → app: 一次 hook 调用的完整描述。
+/// relay → app: full description of one hook call.
 public struct HookEvent: Codable, Sendable {
     public let id: UUID
-    public let event: String           // 原始字符串，便于转发未知事件
-    public let payload: AnyCodable     // Claude 传来的原始 payload
-    public let env: [String: String]   // ITERM_SESSION_ID, TERM_PROGRAM, PWD 等
+    public let event: String           // raw string, so unknown events can be forwarded
+    public let payload: AnyCodable     // raw payload from Claude
+    public let env: [String: String]   // ITERM_SESSION_ID, TERM_PROGRAM, PWD, etc.
     public let cwd: String
     public let timestamp: Date
-    public let ppid: Int?              // relay 的父进程 PID (≈ claude 进程)
+    public let ppid: Int?              // relay's parent PID (≈ the claude process)
 
     public init(
         id: UUID = UUID(),
@@ -44,7 +44,7 @@ public struct HookEvent: Codable, Sendable {
         HookEventType(rawValue: event) ?? .unknown
     }
 
-    // MARK: 解析快捷方法
+    // MARK: Parsing helpers
 
     public var toolName: String? {
         payload["tool_name"]?.stringValue ?? payload["tool"]?.stringValue
@@ -71,12 +71,12 @@ public struct HookEvent: Codable, Sendable {
     }
 }
 
-/// app → relay: 决策结果。
+/// app → relay: the decision.
 public enum Decision: String, Codable, Sendable {
-    case allow      // 等价于 {"continue":true}
+    case allow      // equivalent to {"continue":true}
     case deny       // {"continue":false, "reason": ...}
-    case denyTool   // 只拦下这一条命令,Claude 收到原因后可以继续干别的 (超时自动拒绝用)
-    case askUser    // 用户已在终端处理（点了 Continue in Terminal）
+    case denyTool   // block only this command; Claude gets the reason and can keep working (used for timeout auto-deny)
+    case askUser    // the user is handling it in the terminal (clicked "Go to terminal")
 }
 
 public struct HookResponse: Codable, Sendable {
@@ -90,8 +90,8 @@ public struct HookResponse: Codable, Sendable {
         self.reason = reason
     }
 
-    /// 转换为 Claude Code hook 期望的 stdout JSON。
-    /// PreToolUse 事件需要用 hookSpecificOutput.permissionDecision 才能跳过原生审批。
+    /// Converts to the stdout JSON Claude Code expects from a hook.
+    /// PreToolUse needs hookSpecificOutput.permissionDecision to skip the native prompt.
     public func toClaudeJSON(eventName: String? = nil) -> String {
         let isPreToolUse = (eventName == "PreToolUse")
         switch decision {
@@ -101,7 +101,7 @@ public struct HookResponse: Codable, Sendable {
             }
             return #"{"continue":true}"#
         case .askUser:
-            // 让 Claude Code 自己继续走原生流程 (用户已 / 将到终端处理)
+            // Let Claude Code continue with its own flow (the user is / will be in the terminal)
             return #"{"continue":true}"#
         case .deny:
             let reasonStr = reason ?? "Denied by Claude Notch"
@@ -126,7 +126,7 @@ public struct HookResponse: Codable, Sendable {
     }
 }
 
-/// 编/解码工具。
+/// Encoding/decoding helpers.
 public enum HookCodec {
     public static let encoder: JSONEncoder = {
         let e = JSONEncoder()

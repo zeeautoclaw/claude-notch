@@ -1,6 +1,6 @@
 import Foundation
 
-/// 一次待审批/待回应的 hook 请求。
+/// One hook request waiting for approval or a reply.
 public final class ApprovalRequest: Identifiable, ObservableObject {
     public let id: UUID
     public let event: HookEvent
@@ -14,7 +14,7 @@ public final class ApprovalRequest: Identifiable, ObservableObject {
         self.event = event
     }
 
-    /// 调用方在后台线程阻塞等待。
+    /// The caller blocks on a background thread.
     public func wait(timeout: DispatchTime = .distantFuture) -> HookResponse {
         _ = semaphore.wait(timeout: timeout)
         lock.lock(); defer { lock.unlock() }
@@ -37,7 +37,7 @@ public final class ApprovalRequest: Identifiable, ObservableObject {
     }
 }
 
-/// 队列。UI 总是看 queue.first。
+/// The queue. The UI always shows queue.first.
 public final class ApprovalQueue: ObservableObject {
     @Published public private(set) var queue: [ApprovalRequest] = []
 

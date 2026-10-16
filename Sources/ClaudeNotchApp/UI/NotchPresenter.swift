@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 import Combine
 
-/// 屏幕顶部居中的浮动面板。包装一个 NSPanel + 内嵌 SwiftUI 内容。
+/// Floating panel centered at the top of the screen. Wraps an NSPanel with SwiftUI content.
 public final class NotchPresenter: NSObject {
     private var panel: NSPanel?
     private var host: NSHostingView<NotchRootView>?
@@ -65,7 +65,7 @@ public final class NotchPresenter: NSObject {
     public func show() {
         ensurePanel()
         guard let p = panel else { return }
-        // 先按当前卡片大小摆位;SwiftUI 刷新完内容后再按真实大小摆一次
+        // Position for the current card size first; once SwiftUI has updated, position again at the real size
         p.setFrame(Self.targetFrame(for: fittingSize()), display: false)
         p.orderFrontRegardless()
         DispatchQueue.main.async { [weak self] in
@@ -93,7 +93,7 @@ public final class NotchPresenter: NSObject {
         TerminalJumper.jump(to: req.event)
     }
 
-    /// 卡片 (含四周透明边距) 的真实大小;还没内容时给一个默认值。
+    /// Real size of the card (including the transparent margin); a default before there is content.
     private func fittingSize() -> NSSize {
         guard let host else { return Self.defaultSize }
         host.layoutSubtreeIfNeeded()
@@ -116,7 +116,7 @@ public final class NotchPresenter: NSObject {
     }
 }
 
-/// SwiftUI 根 View — 根据 queue.first 路由到对应卡片。
+/// SwiftUI root view — routes queue.first to the matching card.
 struct NotchRootView: View {
     @ObservedObject var queue: ApprovalQueue
     @ObservedObject var rules: RulesStore
@@ -151,9 +151,9 @@ struct NotchRootView: View {
                 request: req,
                 waiting: waiting,
                 onChoose: { answer in
-                    // 1) 让 PreToolUse 通过 → AskUserQuestion 工具开始执行,等用户输入
+                    // 1) Let PreToolUse through → AskUserQuestion starts and waits for input
                     queue.resolveCurrent(decision: .allow)
-                    // 2) 等 350ms 让 TUI 渲染选项,再写入数字 + CR (TUI 要 \r 才认 Enter)
+                    // 2) Wait 350 ms for the TUI to draw the options, then type the number + CR (the TUI needs \r for Enter)
                     DispatchQueue.global().asyncAfter(deadline: .now() + 0.35) {
                         TerminalJumper.type(text: answer + "\r", into: event)
                     }
